@@ -26,3 +26,7 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 ### Fase 1 - Paso 1.1 y 1.2
 - Creado `src/db.js` configurando la conexión a SQLite en `database.sqlite`.
 - Creada la tabla `games` con los campos id, title, filename, prompt_used y created_at.
+
+### Fase 1 - Paso 1.3 y 1.4
+- Creado `src/server.js` con configuración básica de Express (CORS, JSON y archivos estáticos).
+- Añadido script `start` en `package.json`.
