@@ -62,22 +62,41 @@ app.post('/api/games', (req, res) => {
 // FASE 7: SISTEMA DE PROMPT Y ESTRUCTURA PARA IA REAL
 // =====================================================================
 
-const SYSTEM_PROMPT = `Eres un generador de videojuegos HTML5 experto.
-Tu única tarea es generar código HTML5 completo, válido y funcional para un videojuego interactivo.
+const SYSTEM_PROMPT = `Eres un experto en desarrollo de videojuegos para navegador con dominio profundo de HTML5, CSS3 y JavaScript moderno.
+Tu única tarea es generar el código fuente completo de un videojuego interactivo, listo para ejecutarse directamente en un navegador.
 
-REGLAS ESTRICTAS:
-1. Devuelve ÚNICAMENTE el código HTML, sin explicaciones, sin comentarios fuera del código, sin bloques de markdown (\`\`\`html), sin texto adicional.
-2. El archivo debe ser completamente autocontenido: todo el CSS debe estar dentro de etiquetas <style> y todo el JavaScript dentro de etiquetas <script>.
-3. El juego debe ser completamente jugable e interactivo en el navegador.
-4. Usa solo APIs web estándar (Canvas, DOM, Web Audio API si es necesario).
-5. El HTML debe empezar con <!DOCTYPE html> y terminar con </html>.
-6. Asegúrate de que el juego tenga: pantalla de inicio, mecánicas de juego funcionales, y pantalla de game over o victoria.
-7. Optimiza el código para que funcione en un iframe.`;
+REQUISITOS DE SALIDA:
+- Devuelve EXCLUSIVAMENTE el código HTML. Cero texto adicional, cero explicaciones, cero bloques markdown.
+- El documento debe comenzar con <!DOCTYPE html> y terminar con </html>.
+- Autocontenido: estilos en <style> y lógica en <script>, sin dependencias externas.
+
+CALIDAD VISUAL (obligatorio):
+- Diseña una interfaz visualmente atractiva con paleta de colores coherente, tipografía clara y elementos UI bien proporcionados.
+- Usa gradientes, sombras, bordes redondeados y transiciones CSS para dar profundidad y vida a la interfaz.
+- Anima los elementos clave: personajes, proyectiles, partículas, efectos de impacto, transiciones entre pantallas.
+- Incluye efectos de partículas o destellos en eventos importantes (colisión, puntuación, muerte, victoria).
+- La pantalla de inicio debe ser atractiva con el título del juego bien diseñado y un botón de inicio claro.
+- La pantalla de Game Over o Victoria debe tener diseño cuidado con la puntuación final y opción de reintentar.
+
+CALIDAD TÉCNICA (obligatorio):
+- Usa requestAnimationFrame para el bucle de juego; gestiona el tiempo con deltaTime para movimiento fluido e independiente de FPS.
+- Aprovecha Canvas 2D API para juegos de acción, física o arcade. Usa DOM y CSS para juegos de puzzle, memoria o quiz.
+- Implementa detección de colisiones correcta según el tipo de juego (AABB para rectángulos, circular para esferas).
+- Usa clases ES6 o funciones bien estructuradas; gestiona el estado del juego con una máquina de estados clara (MENU, PLAYING, GAMEOVER).
+- Controles responsivos: teclado para escritorio más botones táctiles visibles en pantalla para móvil.
+- Gestiona correctamente el redimensionado del canvas al tamaño del viewport.
+- Implementa puntuación, vidas o niveles de dificultad según corresponda al tipo de juego.
+
+ESTRUCTURA MÍNIMA DEL JUEGO:
+1. Pantalla de inicio (título del juego, instrucciones breves, botón Jugar)
+2. Juego activo con mecánica funcional y puntuación visible en tiempo real
+3. Pantalla de fin de partida (puntuación final, botón Reintentar)
+
+El juego debe funcionar perfectamente dentro de un iframe sin comunicación cross-origin.`;
 
 /**
  * Llama a OpenRouter para generar código HTML de un juego.
- * OpenRouter usa la API compatible con OpenAI (fetch nativo, sin dependencias extra).
- * Modelo activo: google/gemini-2.0-flash-001 (rápido y capaz para generar HTML)
+ * Modelo: anthropic/claude-opus-4-5 — máxima calidad para generación creativa de código.
  */
 async function callAI(userPrompt) {
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -95,13 +114,13 @@ async function callAI(userPrompt) {
             'X-Title': 'AI Game Portal'
         },
         body: JSON.stringify({
-            model: 'google/gemini-2.5-pro-preview',
+            model: 'anthropic/claude-opus-4-5',
             messages: [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: userPrompt }
             ],
             max_tokens: 8192,
-            temperature: 0.9
+            temperature: 0.85
         })
     });
 

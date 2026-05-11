@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mario Super World</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #222;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            background-color: #78b0f0;
+            display: block;
+            border: 4px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 600;
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+
+        // --- Game State ---
+        let gameState = 'START'; // START, PLAYING, GAME_OVER, WIN
+        let keys = {};
+
+        // --- Game Constants ---
+        const GRAVITY = 0.6;
+        const PLAYER_SPEED = 5;
+        const JUMP_FORCE = -15;
+
+        // --- Game Objects ---
+        let player, level, camera, score;
+
+        // --- Player Object ---
+        class Player {
+            constructor(x, y) {
+                this.width = 32;
+                this.height = 48;
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.isGrounded = false;
+                this.direction = 'right';
+            }
+
+            draw() {
+                // Overalls
+                ctx.fillStyle = '#1e90ff';
+                ctx.fillRect(this.x, this.y + 24, this.width, 24);
+                ctx.fillRect(this.x + 4, this.y + 16, 8, 8);
+                ctx.fillRect(this.x + this.width - 12, this.y + 16, 8, 8);
+
+                // Shirt
+                ctx.fillStyle = '#ff4500';
+                ctx.fillRect(this.x, this.y + 16, this.width, 16);
+
+                // Shoes
+                ctx.fillStyle = '#8b4513';
+                ctx.fillRect(this.x - 2, this.y + this.height - 6, 14, 6);
+                ctx.fillRect(this.x + this.width - 12, this.y + this.height - 6, 14, 6);
+
+                // Head
+                ctx.fillStyle = '#ffdab9';
+                ctx.fillRect(this.x + 4, this.y, this.width - 8, 16);
+
+                // Hat
+                ctx.fillStyle = '#ff4500';
+                ctx.fillRect(this.x, this.y - 8, this.width, 8);
+                if (this.direction === 'right') {
+                    ctx.fillRect(this.x + this.width - 8, this.y, 8, -8);
+                } else {
+                    ctx.fillRect(this.x, this.y, 8, -8);
+                }
+
+                // Eyes
+                ctx.fillStyle = '#000';
+                if (this.direction === 'right') {
+                    ctx.fillRect(this.x + 20, this.y + 4, 4, 4);
+                    ctx.fillRect(this.x + 26, this.y + 4, 4, 4);
+                } else {
+                    ctx.fillRect(this.x + 4, this.y + 4, 4, 4);
+                    ctx.fillRect(this.x + 10, this.y + 4, 4, 4);
+                }
+
+                // Mustache
+                if(this.direction === 'right'){
+                    ctx.fillRect(this.x + 16, this.y + 12, 12, 4);
+                } else {
+                    ctx.fillRect(this.x + 6, this.y + 12, 12, 4);
+                }
+            }
+            
+            update() {
+                // Horizontal movement
+                if (keys['ArrowLeft'] || keys['a']) {
+                    this.vx = -PLAYER_SPEED;
+                    this.direction = 'left';
+                } else if (keys['ArrowRight'] || keys['d']) {
+                    this.vx = PLAYER_SPEED;
+                    this.direction = 'right';
+                } else {
+                    this.vx = 0;
+                }
+
+                // Jumping
+                if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && this.isGrounded) {
+                    this.vy = JUMP_FORCE;
+                    this.isGrounded = false;
+                }
+
+                // Apply gravity
+                this.vy += GRAVITY;
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+                this.isGrounded = false;
+
+                // Fall off screen
+                if (this.y > GAME_HEIGHT) {
+                    gameState = 'GAME_OVER';
+                }
+            }
+        }
+
+        // --- Enemy Object ---
+        class Enemy {
+            constructor(x, y, range=100) {
+                this.x = x;
+                this.y = y;
+                this.width = 32;
+                this.height = 32;
+                this.startX = x;
+                this.range = range;
+                this.direction = 1;
+                this.speed = 1;
+                this.isActive = true;
+            }
+
+            update() {
+                if (!this.isActive) return;
+                this.x += this.speed * this.direction;
+                if (this.x > this.startX + this.range || this.x < this.startX) {
+                    this.direction *= -1;
+                }
+            }
+
+            draw() {
+                if (!this.isActive) return;
+                // Body
+                ctx.fillStyle = '#a0522d';
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + this.height);
+                ctx.lineTo(this.x, this.y + 10);
+                ctx.quadraticCurveTo(this.x + this.width / 2, this.y - 10, this.x + this.width, this.y + 10);
+                ctx.lineTo(this.x + this.width, this.y + this.height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Face
+                ctx.fillStyle = '#ffebcd';
+                ctx.fillRect(this.x + 6, this.y + 12, this.width - 12, 10);
+                
+                // Eyes
+                ctx.fillStyle = '#000';
+                ctx.fillRect(this.x + 8, this.y + 14, 4, 5);
+                ctx.fillRect(this.x + this.width - 12, this.y + 14, 4, 5);
+
+                // Feet
+                ctx.fillStyle = '#5c3317';
+                ctx.fillRect(this.x, this.y + this.height - 4, 10, 4);
+                ctx.fillRect(this.x + this.width - 10, this.y + this.height - 4, 10, 4);
+            }
+        }
+        
+        // --- Coin Object ---
+        class Coin {
+            constructor(x, y){
+                this.x = x;
+                this.y = y;
+                this.width = 20;
+                this.height = 20;
+                this.isActive = true;
+                this.frame = 0;
+            }
+
+            update() {
+                this.frame = (this.frame + 0.2) % 6;
+            }
+
+            draw() {
+                if (!this.isActive) return;
+                ctx.fillStyle = '#ffd700';
+                ctx.strokeStyle = '#e6b800';
+                ctx.lineWidth = 2;
+                
+                const scaleX = Math.cos(this.frame);
+                const currentWidth = this.width * Math.abs(scaleX);
+
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.width / 2, this.y + this.height/2, currentWidth / 2, this.height/2, 0, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+
+                // Shine
+                if(scaleX > 0) {
+                    ctx.fillStyle = '#fff68f';
+                    ctx.beginPath();
+                    ctx.arc(this.x + 8, this.y + 8, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        
+        // --- Level Definition ---
+        function createLevel() {
+            const platforms = [
+                // Ground
+                { x: -200, y: 550, width: 1000, type: 'ground' },
+                { x: 900, y: 550, width: 800, type: 'ground' },
+                { x: 1800, y: 550, width: 1000, type: 'ground' },
+                { x: 3000, y: 550, width: 400, type: 'ground' },
+                
+                // Floating platforms
+                { x: 250, y: 450, width: 150, type: 'block' },
+                { x: 450, y: 350, width: 150, type: 'block' },
+                { x: 650, y: 250, width: 150, type: 'block' },
+                
+                // Tricky jumps
+                { x: 1200, y: 450, width: 80, type: 'block' },
+                { x: 1350, y: 380, width: 80, type: 'block' },
+                { x: 1500, y: 310, width: 80, type: 'block' },
+
+                // Enemy platform
+                { x: 1900, y: 400, width: 400, type: 'block' },
+                
+                // Path to Goal
+                { x: 2500, y: 450, width: 100, type: 'block' },
+                { x: 2650, y: 350, width: 100, type: 'block' },
+                { x: 2800, y: 250, width: 100, type: 'block' },
+
+                // Goal Platform
+                { x: 3100, y: 450, width: 100, type: 'block' },
+            ];
+
+            const enemies = [
+                new Enemy(950, 550 - 32, 150),
+                new Enemy(1950, 400 - 32, 100),
+                new Enemy(2150, 400 - 32, 100),
+                new Enemy(3000, 550-32, 0)
+            ];
+
+            const coins = [
+                new Coin(280, 410), new Coin(310, 410), new Coin(340, 410),
+                new Coin(480, 310), new Coin(510, 310), new Coin(540, 310),
+                new Coin(1215, 410), new Coin(1365, 340), new Coin(1515, 270),
+                new Coin(2050, 300), new Coin(2080, 300), new Coin(2110, 300)
+            ];
+
+            const goal = { x: 3130, y: 250, width: 20, height: 200 };
+
+            return { platforms, enemies, coins, goal, width: 3400 };
+        }
+
+        // --- Collision Detection ---
+        function checkCollisions() {
+            // Player vs Platforms
+            level.platforms.forEach(p => {
+                // Check if player is horizontally within platform bounds
+                if (player.x < p.x + p.width && player.x + player.width > p.x) {
+                    // Check for vertical collision (landing on top)
+                    if (player.y + player.height > p.y && player.y + player.height < p.y + player.vy + 2) {
+                        player.vy = 0;
+                        player.y = p.y - player.height;
+                        player.isGrounded = true;
+                    }
+                    // Check for collision with bottom of platform
+                    if (player.y < p.y + p.height && player.y > p.y + p.height + player.vy - 2) {
+                        player.vy = 0.1;
+                        player.y = p.y + p.height;
+                    }
+                }
+                
+                // Check for horizontal collisions
+                if (player.y + player.height > p.y && player.y < p.y + p.height) {
+                    // Right side of player collides with left side of platform
+                    if(player.x + player.width > p.x && player.x + player.width < p.x + player.vx + 2) {
+                        player.vx = 0;
+                        player.x = p.x - player.width;
+                    }
+                    // Left side of player collides with right side of platform
+                    if(player.x < p.x + p.width && player.x > p.x + p.width + player.vx - 2) {
+                        player.vx = 0;
+                        player.x = p.x + p.width;
+                    }
+                }
+            });
+
+            // Player vs Enemies
+            level.enemies.forEach(e => {
+                if (!e.isActive) return;
+                if (player.x < e.x + e.width && player.x + player.width > e.x &&
+                    player.y < e.y + e.height && player.y + player.height > e.y) {
+                    // Stomp on enemy
+                    if (player.vy > 0 && player.y + player.height < e.y + 20) {
+                        e.isActive = false;
+                        player.vy = -8; // bounce
+                        score += 100;
+                    } else {
+                        // Player gets hit
+                        gameState = 'GAME_OVER';
+                    }
+                }
+            });
+
+            // Player vs Coins
+            level.coins.forEach(c => {
+                if (!c.isActive) return;
+                if (player.x < c.x + c.width && player.x + player.width > c.x &&
+                    player.y < c.y + c.height && player.y + player.height > c.y) {
+                        c.isActive = false;
+                        score += 50;
+                }
+            });
+
+            // Player vs Goal
+            if (player.x < level.goal.x + level.goal.width && player.x + player.width > level.goal.x &&
+                player.y < level.goal.y + level.goal.height && player.y + player.height > level.goal.y) {
+                gameState = 'WIN';
+            }
+        }
+        
+        // --- Drawing Functions ---
+        function drawPlatform(p) {
+            if (p.type === 'ground') {
+                ctx.fillStyle = '#654321'; // Dirt
+                ctx.fillRect(p.x, p.y, p.width, p.height);
+                ctx.fillStyle = '#228b22'; // Grass
+                ctx.fillRect(p.x, p.y, p.width, 20);
+            } else { // Block
+                ctx.fillStyle = '#d2691e'; // Brown block
+                ctx.fillRect(p.x, p.y, p.width, p.height);
+                ctx.strokeStyle = '#8b4513'; // Darker outline
+                ctx.lineWidth = 4;
+                ctx.strokeRect(p.x, p.y, p.width, p.height);
+                // Rivets
+                ctx.fillStyle = '#a0522d';
+                ctx.fillRect(p.x + 4, p.y + 4, 8, 8);
+                ctx.fillRect(p.x + p.width - 12, p.y + 4, 8, 8);
+            }
+        }
+
+        function drawGoal(g) {
+            // Pole
+            ctx.fillStyle = '#c0c0c0';
+            ctx.fillRect(g.x, g.y, 10, g.height);
+            // Ball at top
+            ctx.beginPath();
+            ctx.arc(g.x + 5, g.y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffd700';
+            ctx.fill();
+            // Flag
+            ctx.beginPath();
+            ctx.moveTo(g.x + 10, g.y + 10);
+            ctx.lineTo(g.x + 60, g.y + 35);
+            ctx.lineTo(g.x + 10, g.y + 60);
+            ctx.closePath();
+            ctx.fillStyle = '#32cd32';
+            ctx.fill();
+        }
+
+        function drawClouds() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            const drawCloud = (x, y) => {
+                ctx.beginPath();
+                ctx.arc(x, y, 20, Math.PI * 0.5, Math.PI * 1.5);
+                ctx.arc(x + 25, y - 15, 25, Math.PI * 1, Math.PI * 2);
+                ctx.arc(x + 55, y, 20, Math.PI * 1.5, Math.PI * 0.5);
+                ctx.closePath();
+                ctx.fill();
+            }
+            drawCloud(100 - camera.x * 0.5, 100);
+            drawCloud(300 - camera.x * 0.5, 150);
+            drawCloud(600 - camera.x * 0.5, 80);
+            drawCloud(900 - camera.x * 0.5, 120);
+            drawCloud(1200 - camera.x * 0.5, 100);
+            drawCloud(1500 - camera.x * 0.5, 150);
+        }
+
+        // --- Game Setup / Reset ---
+        function resetGame() {
+            player = new Player(100, 400);
+            level = createLevel();
+            camera = { x: 0 };
+            score = 0;
+            gameState = 'PLAYING';
+        }
+
+        // --- Main Game Loop ---
+        function gameLoop() {
+            // --- Update ---
+            if (gameState === 'PLAYING') {
+                player.update();
+                level.enemies.forEach(e => e.update());
+                level.coins.forEach(c => c.update());
+                checkCollisions();
+
+                // Update camera
+                camera.x = player.x - GAME_WIDTH / 3;
+                if (camera.x < 0) camera.x = 0;
+                if (camera.x > level.width - GAME_WIDTH) camera.x = level.width - GAME_WIDTH;
+            }
+
+            // --- Draw ---
+            // Clear and draw background
+            ctx.fillStyle = '#78b0f0';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            ctx.save();
+            ctx.translate(-camera.x, 0);
+
+            drawClouds();
+
+            // Draw game objects
+            level.platforms.forEach(p => drawPlatform(p));
+            level.enemies.forEach(e => e.draw());
+            level.coins.forEach(c => c.draw());
+            drawGoal(level.goal);
+            player.draw();
+            
+            ctx.restore();
+
+            // Draw UI / Text Screens
+            if (gameState === 'START') {
+                drawTextScreen('Mario Super World', 'Press Enter to Start');
+            } else if (gameState === 'GAME_OVER') {
+                drawTextScreen('Game Over', 'Press Enter to Retry', `Score: ${score}`);
+            } else if (gameState === 'WIN') {
+                drawTextScreen('You Win!', 'Press Enter to Play Again', `Final Score: ${score}`);
+            } else {
+                // Draw HUD
+                ctx.fillStyle = '#fff';
+                ctx.font = '24px "Courier New", Courier, monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(`SCORE: ${score}`, 20, 40);
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawTextScreen(title, subtitle, scoreText = '') {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 60px "Courier New", Courier, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(title, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40);
+            
+            ctx.font = '24px "Courier New", Courier, monospace';
+            ctx.fillText(subtitle, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20);
+
+            if(scoreText) {
+                ctx.font = '30px "Courier New", Courier, monospace';
+                ctx.fillText(scoreText, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 80);
+            }
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === 'Enter') {
+                if (gameState === 'START' || gameState === 'GAME_OVER' || gameState === 'WIN') {
+                    resetGame();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // --- Start Game ---
+        gameLoop();
+
+    </script>
+</body>
+</html>

@@ -70,3 +70,13 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 - Integrado OpenRouter como proveedor de IA real (modelo: `google/gemini-2.0-flash-001`).
 - Usa `fetch` nativo, sin dependencias extra.
 - La API key se carga desde `.env` (excluido del repositorio por `.gitignore`).
+
+---
+
+## Parches de Actualización
+
+### v1.1 — Estética Friv + Prompt Mejorado + Mejor Modelo
+- **[UI]** Rediseño completo de `public/css/styles.css` al estilo Friv original: fondo naranja vibrante, tiles cuadrados pequeños (106px) y coloridos, header y footer oscurecidos, botón de creación amarillo con sombra.
+- **[UI]** Tiles con paleta de 7 colores rotativos y efecto hover de escala pronunciado (como Friv).
+- **[AI]** System Prompt completamente reescrito: incluye requisitos de calidad visual (gradientes, partículas, animaciones, pantallas de inicio/fin) y calidad técnica (requestAnimationFrame, deltaTime, Canvas API, clases ES6, controles táctiles).
+- **[AI]** Modelo cambiado a `anthropic/claude-opus-4-5` — el más capaz para generación creativa de código complejo.
