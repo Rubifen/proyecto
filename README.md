@@ -7,3 +7,6 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 ### Fase 0 - Paso 0.1
 - Inicializado proyecto Node.js (`npm init -y`).
 - Creada la estructura de carpetas: `public/`, `public/css/`, `public/js/`, `public/games/`, `src/`.
+
+### Fase 0 - Paso 0.2
+- Instaladas las dependencias: `express`, `cors`, `sqlite3` y `dotenv`.
