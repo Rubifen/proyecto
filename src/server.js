@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -74,48 +75,43 @@ REGLAS ESTRICTAS:
 7. Optimiza el código para que funcione en un iframe.`;
 
 /**
- * Llama a la API de IA para generar código HTML de un juego.
- * @param {string} userPrompt - El prompt del usuario describiendo el juego
- * @returns {Promise<string>} - Código HTML del juego generado
- *
- * PARA ACTIVAR: descomenta el bloque que corresponda a tu proveedor.
- * Recuerda añadir la API key en el archivo .env (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+ * Llama a OpenRouter para generar código HTML de un juego.
+ * OpenRouter usa la API compatible con OpenAI (fetch nativo, sin dependencias extra).
+ * Modelo activo: google/gemini-2.0-flash-001 (rápido y capaz para generar HTML)
  */
 async function callAI(userPrompt) {
-    // --- OPCIÓN 1: OpenAI (GPT-4o) ---
-    // const { OpenAI } = require('openai');
-    // const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    // const response = await openai.chat.completions.create({
-    //     model: 'gpt-4o',
-    //     messages: [
-    //         { role: 'system', content: SYSTEM_PROMPT },
-    //         { role: 'user', content: userPrompt }
-    //     ],
-    //     max_tokens: 4096,
-    //     temperature: 0.8
-    // });
-    // return response.choices[0].message.content.trim();
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+        console.warn('OPENROUTER_API_KEY no configurada. Usando simulación.');
+        return null;
+    }
 
-    // --- OPCIÓN 2: Anthropic Claude ---
-    // const Anthropic = require('@anthropic-ai/sdk');
-    // const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    // const message = await client.messages.create({
-    //     model: 'claude-opus-4-5',
-    //     max_tokens: 4096,
-    //     system: SYSTEM_PROMPT,
-    //     messages: [{ role: 'user', content: userPrompt }]
-    // });
-    // return message.content[0].text.trim();
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': 'AI Game Portal'
+        },
+        body: JSON.stringify({
+            model: 'google/gemini-2.0-flash-001',
+            messages: [
+                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'user', content: userPrompt }
+            ],
+            max_tokens: 8192,
+            temperature: 0.9
+        })
+    });
 
-    // --- OPCIÓN 3: Google Gemini ---
-    // const { GoogleGenerativeAI } = require('@google/generative-ai');
-    // const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro', systemInstruction: SYSTEM_PROMPT });
-    // const result = await model.generateContent(userPrompt);
-    // return result.response.text().trim();
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`OpenRouter error ${response.status}: ${errText}`);
+    }
 
-    // --- SIMULACIÓN (activa hasta que configures una API real) ---
-    return null; // null = usar HTML simulado
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
 }
 
 // POST /api/generate

@@ -65,3 +65,8 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 ### Fase 7 - Paso 7.1 y 7.2
 - El endpoint `/api/generate` incluye la función `callAI()` con estructura preparada para OpenAI, Anthropic Claude y Google Gemini (comentados).
 - Implementado el `SYSTEM_PROMPT` interno que obliga a la IA a devolver únicamente código HTML válido y autocontenido.
+
+### Integración OpenRouter
+- Integrado OpenRouter como proveedor de IA real (modelo: `google/gemini-2.0-flash-001`).
+- Usa `fetch` nativo, sin dependencias extra.
+- La API key se carga desde `.env` (excluido del repositorio por `.gitignore`).
