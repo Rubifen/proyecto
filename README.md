@@ -34,3 +34,34 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 ### Fase 2 - Paso 2.1 y 2.2
 - Creado endpoint `GET /api/games` en `src/server.js`.
 - Creado endpoint `POST /api/games` (modo stub) que genera un archivo HTML falso y guarda el registro en la base de datos.
+
+### Fase 3 - Paso 3.1
+- Creado `public/index.html` con header, grid principal y footer para el botón de creación.
+
+### Fase 3 - Paso 3.2
+- Creado `public/css/styles.css` con diseño oscuro premium: grid responsivo, tarjetas con hover animado y efectos glassmorphism.
+
+### Fase 3 - Paso 3.3
+- Creado `public/js/app.js` con función `loadGames()` que hace fetch a `/api/games` y renderiza dinámicamente el grid.
+
+### Fase 4 - Paso 4.1 al 4.5
+- Añadida barra inferior fija con botón "+" de creación.
+- Diseñado y ocultado el Modal de creación con botón "X" y lógica de apertura/cierre.
+- Implementado selector visual Modo Simple / Modo Avanzado.
+- Creado formulario Simple (Temática, Tipo de Juego, Colores) y Avanzado (Textarea de prompt libre).
+- Añadido botón "Generar Juego" y estado visual de generación con spinner.
+
+### Fase 5 - Paso 5.1 al 5.3
+- El formulario intercepta el submit y hace fetch POST a `/api/generate`.
+- Creado endpoint `POST /api/generate` en el backend con generación simulada de HTML.
+- Al completar la generación, el modal se cierra y el grid se refresca automáticamente.
+
+### Fase 6 - Paso 6.1 al 6.4
+- Creado `public/play.html` con iframe sandboxed y botón de volver al catálogo.
+- Creado `public/css/play.css` con diseño del reproductor a pantalla completa.
+- Creado `public/js/play.js` que lee el parámetro `file` de la URL e inyecta el src en el iframe.
+- Las tarjetas del grid redirigen a `play.html?file=[filename]`.
+
+### Fase 7 - Paso 7.1 y 7.2
+- El endpoint `/api/generate` incluye la función `callAI()` con estructura preparada para OpenAI, Anthropic Claude y Google Gemini (comentados).
+- Implementado el `SYSTEM_PROMPT` interno que obliga a la IA a devolver únicamente código HTML válido y autocontenido.

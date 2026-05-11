@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Portal de juegos generados por IA. Crea y juega juegos únicos al instante.">
+    <title>AI Game Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <header id="main-header">
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">🎮</span>
+                <span class="logo-text">AI<span class="logo-accent">Games</span></span>
+            </div>
+            <div class="header-subtitle">Juegos generados por inteligencia artificial</div>
+        </div>
+    </header>
+
+    <!-- MAIN GRID -->
+    <main id="main-content">
+        <div id="games-grid" class="games-grid">
+            <!-- Los juegos se renderizan aquí dinámicamente -->
+        </div>
+        <div id="empty-state" class="empty-state hidden">
+            <div class="empty-icon">🕹️</div>
+            <h2>¡No hay juegos todavía!</h2>
+            <p>Pulsa el botón <strong>+</strong> para generar tu primer juego con IA.</p>
+        </div>
+    </main>
+
+    <!-- BOTTOM BAR -->
+    <footer id="bottom-bar">
+        <button id="create-btn" class="create-btn" title="Crear nuevo juego con IA">
+            <span class="create-btn-icon">+</span>
+            <span class="create-btn-label">Crear Juego con IA</span>
+        </button>
+    </footer>
+
+    <!-- MODAL DE CREACIÓN -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <button id="modal-close" class="modal-close" aria-label="Cerrar">✕</button>
+
+            <div class="modal-header">
+                <h2 id="modal-title">✨ Crear nuevo juego</h2>
+                <p class="modal-subtitle">La IA generará un juego completo y jugable</p>
+            </div>
+
+            <!-- SELECTOR DE MODO -->
+            <div class="mode-selector">
+                <button id="btn-mode-simple" class="mode-btn active" data-mode="simple">
+                    <span class="mode-icon">⚡</span>
+                    <span>Modo Simple</span>
+                </button>
+                <button id="btn-mode-advanced" class="mode-btn" data-mode="advanced">
+                    <span class="mode-icon">🔬</span>
+                    <span>Modo Avanzado</span>
+                </button>
+            </div>
+
+            <!-- FORMULARIO SIMPLE -->
+            <form id="form-simple" class="game-form">
+                <div class="form-group">
+                    <label for="input-title-simple">Título del juego</label>
+                    <input type="text" id="input-title-simple" placeholder="Ej: Aventura espacial" maxlength="60" required>
+                </div>
+                <div class="form-group">
+                    <label for="input-theme">Temática</label>
+                    <input type="text" id="input-theme" placeholder="Ej: Espacio, Fantasía, Deportes..." maxlength="80">
+                </div>
+                <div class="form-group">
+                    <label for="input-gametype">Tipo de juego</label>
+                    <select id="input-gametype">
+                        <option value="">Elige un tipo...</option>
+                        <option value="plataformas">Plataformas</option>
+                        <option value="puzzle">Puzzle / Rompecabezas</option>
+                        <option value="arcade">Arcade</option>
+                        <option value="rpg">RPG / Aventura</option>
+                        <option value="trivia">Trivia / Quiz</option>
+                        <option value="memoria">Memoria</option>
+                        <option value="snake">Snake / Serpiente</option>
+                        <option value="shooter">Shooter</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="input-colors">Colores / Estilo visual</label>
+                    <input type="text" id="input-colors" placeholder="Ej: Oscuro con neón, colores pastel..." maxlength="80">
+                </div>
+                <button type="submit" id="generate-btn-simple" class="generate-btn">
+                    <span class="btn-icon">🚀</span> Generar Juego
+                </button>
+            </form>
+
+            <!-- FORMULARIO AVANZADO -->
+            <form id="form-advanced" class="game-form hidden">
+                <div class="form-group">
+                    <label for="input-title-advanced">Título del juego</label>
+                    <input type="text" id="input-title-advanced" placeholder="Ej: Dungeon Crawler Pro" maxlength="60" required>
+                </div>
+                <div class="form-group">
+                    <label for="input-prompt">Prompt completo para la IA</label>
+                    <textarea id="input-prompt" rows="7" placeholder="Describe el juego en detalle: mecánicas, personajes, estilo visual, reglas, controles..."></textarea>
+                </div>
+                <button type="submit" id="generate-btn-advanced" class="generate-btn">
+                    <span class="btn-icon">🚀</span> Generar Juego
+                </button>
+            </form>
+
+            <!-- ESTADO DE GENERACIÓN -->
+            <div id="generating-state" class="generating-state hidden">
+                <div class="spinner"></div>
+                <p class="generating-text">Generando tu juego...<br><small>Esto puede tardar unos segundos ⏳</small></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

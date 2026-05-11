@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Reproductor de juegos generados por IA">
+    <title>Jugando... | AI Game Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/play.css">
+</head>
+<body>
+    <!-- TOP BAR -->
+    <header id="play-header">
+        <a href="/" id="back-btn" class="back-btn">
+            <span class="back-icon">←</span>
+            <span>Volver al catálogo</span>
+        </a>
+        <div id="play-title" class="play-title">Cargando...</div>
+        <div class="header-spacer"></div>
+    </header>
+
+    <!-- GAME CONTAINER -->
+    <main id="play-container">
+        <iframe
+            id="game-frame"
+            src=""
+            sandbox="allow-scripts allow-forms allow-same-origin"
+            allowfullscreen
+            title="Juego generado por IA"
+        ></iframe>
+        <div id="frame-loading" class="frame-loading">
+            <div class="spinner"></div>
+            <p>Cargando juego...</p>
+        </div>
+        <div id="frame-error" class="frame-error hidden">
+            <span class="error-icon">⚠️</span>
+            <p>No se encontró el archivo del juego.</p>
+            <a href="/" class="back-link">Volver al catálogo</a>
+        </div>
+    </main>
+
+    <script src="/js/play.js"></script>
+</body>
+</html>
