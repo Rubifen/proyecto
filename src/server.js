@@ -95,7 +95,7 @@ async function callAI(userPrompt) {
             'X-Title': 'AI Game Portal'
         },
         body: JSON.stringify({
-            model: 'google/gemini-2.0-flash-001',
+            model: 'google/gemini-2.5-pro-preview',
             messages: [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: userPrompt }
