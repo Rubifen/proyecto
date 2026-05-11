@@ -275,7 +275,6 @@ app.post('/api/games/edit', async (req, res) => {
         return res.status(400).json({ error: 'filename e instruction son requeridos' });
     }
 
-    // Sanitizar nombre de archivo
     const safeName = filename.replace(/[^a-zA-Z0-9_.\-]/g, '');
     const gamePath = path.join(__dirname, '../public/games', safeName);
 
@@ -283,26 +282,51 @@ app.post('/api/games/edit', async (req, res) => {
         return res.status(404).json({ error: 'Archivo de juego no encontrado' });
     }
 
-    // 1. Leer el HTML actual
+    // 1. Obtener el concepto ORIGINAL del juego desde la base de datos
+    //    (nunca se sobreescribirá, así que siempre es la idea de creación)
+    const gameRecord = await new Promise((resolve) => {
+        db.get('SELECT title, prompt_used FROM games WHERE filename = ?', [safeName], (err, row) => {
+            resolve(err ? null : row);
+        });
+    });
+
+    const originalTitle  = gameRecord?.title       || 'desconocido';
+    const originalPrompt = gameRecord?.prompt_used || 'No disponible';
+
+    // 2. Leer el HTML actual (puede ser la versión ya editada)
     let currentHtml;
     try {
         currentHtml = fs.readFileSync(gamePath, 'utf8');
-    } catch (err) {
+    } catch {
         return res.status(500).json({ error: 'No se pudo leer el archivo del juego' });
     }
 
-    // 2. Crear backup ANTES de modificar
+    // 3. Crear backup ANTES de modificar
     const backupName = safeName.replace('.html', '') + '_backup_' + Date.now() + '.html';
     const backupPath = path.join(BACKUPS_DIR, backupName);
     try {
         fs.copyFileSync(gamePath, backupPath);
-    } catch (err) {
+    } catch {
         return res.status(500).json({ error: 'No se pudo crear el backup' });
     }
 
-    // 3. Llamar a la IA con el HTML actual + instrucción
-    const editPrompt = `Aquí está el código HTML completo del juego actual:\n\n${currentHtml}\n\n---\nInstrucción de modificación del usuario: "${instruction}"\n\nAplica los cambios solicitados y devuelve el código HTML completo y actualizado.`;
+    // 4. Construir el prompt con el concepto original + HTML actual + instrucción
+    const editPrompt =
+`=== CONCEPTO ORIGINAL DEL JUEGO ===
+Título: "${originalTitle}"
+Descripción / prompt de creación: "${originalPrompt}"
 
+=== CÓDIGO HTML ACTUAL DEL JUEGO ===
+(puede haber sido modificado previamente; es la versión vigente)
+
+${currentHtml}
+
+=== INSTRUCCIÓN DE MODIFICACIÓN ===
+El usuario quiere: "${instruction}"
+
+Aplica ÚNICAMENTE los cambios indicados. Conserva toda la mecánica, estética y lógica existente que no esté afectada por la instrucción. Devuelve el documento HTML completo y actualizado.`;
+
+    // 5. Llamar a la IA
     let newHtml;
     try {
         const aiResult = await callAI(editPrompt, true);
@@ -313,27 +337,22 @@ app.post('/api/games/edit', async (req, res) => {
                 .replace(/\s*```$/i, '')
                 .trim();
         } else {
-            // Sin IA configurada — devolver el original sin cambios
             return res.status(503).json({ error: 'No hay API de IA configurada para editar juegos.' });
         }
     } catch (aiErr) {
-        // Si la IA falla, restaurar backup y reportar error
         return res.status(500).json({ error: 'Error de IA: ' + aiErr.message, backupName });
     }
 
-    // 4. Guardar el nuevo HTML
+    // 6. Guardar el nuevo HTML
     try {
         fs.writeFileSync(gamePath, newHtml, 'utf8');
-    } catch (err) {
+    } catch {
         return res.status(500).json({ error: 'No se pudo guardar el juego editado' });
     }
 
-    // 5. Registrar la edición en la base de datos
-    db.run(
-        'UPDATE games SET prompt_used = ? WHERE filename = ?',
-        [`[EDITADO] ${instruction}`, safeName],
-        (err) => { if (err) console.error('DB update error:', err.message); }
-    );
+    // 7. NO sobreescribir prompt_used — el concepto original se conserva siempre.
+    //    Solo registramos cuándo fue editado por última vez en los logs del servidor.
+    console.log(`[EDIT] "${originalTitle}" (${safeName}) modificado: "${instruction}"`);
 
     res.json({ success: true, backupName, message: 'Juego actualizado correctamente' });
 });
