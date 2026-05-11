@@ -30,3 +30,7 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 ### Fase 1 - Paso 1.3 y 1.4
 - Creado `src/server.js` con configuración básica de Express (CORS, JSON y archivos estáticos).
 - Añadido script `start` en `package.json`.
+
+### Fase 2 - Paso 2.1 y 2.2
+- Creado endpoint `GET /api/games` en `src/server.js`.
+- Creado endpoint `POST /api/games` (modo stub) que genera un archivo HTML falso y guarda el registro en la base de datos.
