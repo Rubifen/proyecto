@@ -159,5 +159,75 @@ async function handleGenerate(e, isAdvanced) {
 formSimple.addEventListener('submit', (e) => handleGenerate(e, false));
 formAdvanced.addEventListener('submit', (e) => handleGenerate(e, true));
 
+// =========================================
+// PANEL DE AJUSTES: Tamaño + Modo oscuro
+// =========================================
+
+const settingsToggle = document.getElementById('settings-toggle');
+const settingsDropdown = document.getElementById('settings-dropdown');
+const themeToggle = document.getElementById('theme-toggle');
+const themeIcon = document.getElementById('theme-icon');
+const themeLabel = document.getElementById('theme-label');
+const sizeBtns = document.querySelectorAll('.size-btn');
+
+// --- Abrir / cerrar el panel ---
+settingsToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsDropdown.classList.toggle('hidden');
+});
+
+document.addEventListener('click', (e) => {
+    if (!settingsDropdown.classList.contains('hidden') &&
+        !settingsDropdown.contains(e.target) &&
+        e.target !== settingsToggle) {
+        settingsDropdown.classList.add('hidden');
+    }
+});
+
+// --- Tamaño de iconos ---
+function setIconSize(size) {
+    document.documentElement.style.setProperty('--friv-tile-size', size + 'px');
+    sizeBtns.forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.size) === size);
+    });
+    localStorage.setItem('iconSize', size);
+}
+
+sizeBtns.forEach(btn => {
+    btn.addEventListener('click', () => setIconSize(parseInt(btn.dataset.size)));
+});
+
+// --- Modo oscuro ---
+function setDarkMode(enabled) {
+    document.body.classList.toggle('dark-mode', enabled);
+    if (enabled) {
+        themeIcon.textContent = '☀️';
+        themeLabel.textContent = 'Modo Claro';
+    } else {
+        themeIcon.textContent = '🌙';
+        themeLabel.textContent = 'Modo Oscuro';
+    }
+    localStorage.setItem('darkMode', enabled ? '1' : '0');
+}
+
+themeToggle.addEventListener('click', () => {
+    const isDark = document.body.classList.contains('dark-mode');
+    setDarkMode(!isDark);
+});
+
+// --- Restaurar preferencias al cargar ---
+function restoreSettings() {
+    const savedSize = parseInt(localStorage.getItem('iconSize'));
+    if (savedSize && [70, 106, 140, 180].includes(savedSize)) {
+        setIconSize(savedSize);
+    }
+
+    const savedDark = localStorage.getItem('darkMode');
+    if (savedDark === '1') {
+        setDarkMode(true);
+    }
+}
+
 // --------- Init ---------
+restoreSettings();
 loadGames();

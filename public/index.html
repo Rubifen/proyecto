@@ -119,6 +119,37 @@
             </div>
         </div>
     </div>
+    <!-- PANEL DE AJUSTES (esquina inferior derecha) -->
+    <div id="settings-panel" class="settings-panel">
+        <!-- Botón de apertura -->
+        <button id="settings-toggle" class="settings-toggle" title="Ajustes del portal" aria-label="Ajustes">
+            ⚙️
+        </button>
+        <!-- Panel desplegable -->
+        <div id="settings-dropdown" class="settings-dropdown hidden">
+            <div class="settings-title">⚙️ Ajustes</div>
+
+            <!-- Tamaño de iconos -->
+            <div class="settings-section">
+                <label class="settings-label">Tamaño de iconos</label>
+                <div class="size-btns">
+                    <button class="size-btn" data-size="70"  title="Pequeño">S</button>
+                    <button class="size-btn active" data-size="106" title="Mediano">M</button>
+                    <button class="size-btn" data-size="140" title="Grande">L</button>
+                    <button class="size-btn" data-size="180" title="Extra grande">XL</button>
+                </div>
+            </div>
+
+            <!-- Tema -->
+            <div class="settings-section">
+                <label class="settings-label">Tema</label>
+                <button id="theme-toggle" class="theme-toggle-btn">
+                    <span id="theme-icon">🌙</span>
+                    <span id="theme-label">Modo Oscuro</span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="/js/app.js"></script>
 </body>

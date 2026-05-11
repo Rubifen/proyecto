@@ -80,3 +80,9 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 - **[UI]** Tiles con paleta de 7 colores rotativos y efecto hover de escala pronunciado (como Friv).
 - **[AI]** System Prompt completamente reescrito: incluye requisitos de calidad visual (gradientes, partículas, animaciones, pantallas de inicio/fin) y calidad técnica (requestAnimationFrame, deltaTime, Canvas API, clases ES6, controles táctiles).
 - **[AI]** Modelo cambiado a `anthropic/claude-opus-4-5` — el más capaz para generación creativa de código complejo.
+
+### v1.2 — Panel de Ajustes (Tamaño de Iconos + Modo Oscuro)
+- **[UI]** Añadido panel flotante de ajustes (⚙️) en la esquina inferior derecha, con animación de apertura.
+- **[UI]** Selector de tamaño de iconos con 4 opciones: S (70px), M (106px), L (140px), XL (180px).
+- **[UI]** Botón de alternancia Modo Oscuro / Modo Claro: cambia toda la paleta de colores de naranja Friv a purple-dark.
+- **[JS]** Las preferencias de tamaño y tema se guardan en `localStorage` y se restauran al recargar la página.

@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mario Super World</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Press Start 2P', cursive;
+        }
+        canvas {
+            background-color: #5c94fc;
+            display: block;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Configuración del canvas
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 600;
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+
+        // Estados del juego
+        const GAME_STATE = {
+            START: 0,
+            RUNNING: 1,
+            GAME_OVER: 2,
+            WIN: 3
+        };
+        let currentGameState = GAME_STATE.START;
+
+        // Controles
+        const keys = {
+            right: false,
+            left: false,
+            up: false
+        };
+
+        // Jugador
+        const player = {
+            width: 32,
+            height: 48,
+            x: 100,
+            y: GAME_HEIGHT - 100,
+            speed: 5,
+            velocityX: 0,
+            velocityY: 0,
+            jumpPower: 18,
+            isJumping: false,
+            onGround: false,
+            lives: 3
+        };
+
+        // Física
+        const gravity = 0.8;
+
+        // Elementos del juego
+        let platforms = [];
+        let coins = [];
+        let enemies = [];
+        let goal = {};
+        let score = 0;
+        
+        let camera = {
+            x: 0,
+            y: 0
+        };
+
+        // --- FUNCIONES DE DIBUJO ---
+        function drawPlayer() {
+            ctx.save();
+            ctx.translate(player.x - camera.x, player.y - camera.y);
+            
+            // Cuerpo
+            ctx.fillStyle = '#e74c3c'; // Rojo
+            ctx.fillRect(0, 16, player.width, player.height - 16);
+            
+            // Overol
+            ctx.fillStyle = '#3498db'; // Azul
+            ctx.fillRect(4, 32, player.width - 8, 16);
+            ctx.fillRect(0, 32, 8, 8);
+            ctx.fillRect(player.width - 8, 32, 8, 8);
+
+
+            // Cabeza
+            ctx.fillStyle = '#f1c40f'; // "Piel"
+            ctx.fillRect(4, 0, player.width - 8, 16);
+
+            // Gorra
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(0, 0, player.width, 8);
+
+            // Ojos
+            ctx.fillStyle = 'white';
+            ctx.fillRect(8, 4, 6, 6);
+            ctx.fillRect(18, 4, 6, 6);
+            ctx.fillStyle = 'black';
+            ctx.fillRect(10, 6, 3, 3);
+            ctx.fillRect(20, 6, 3, 3);
+            
+            ctx.restore();
+        }
+
+        function drawPlatforms() {
+            platforms.forEach(p => {
+                const screenX = p.x - camera.x;
+                const screenY = p.y - camera.y;
+
+                if (screenX + p.width < 0 || screenX > GAME_WIDTH || screenY + p.height < 0 || screenY > GAME_HEIGHT) {
+                    return;
+                }
+
+                // Parte superior (césped)
+                ctx.fillStyle = '#27ae60'; // Verde
+                ctx.fillRect(screenX, screenY, p.width, 10);
+                
+                // Parte inferior (tierra)
+                ctx.fillStyle = '#8c5a2b'; // Marrón
+                ctx.fillRect(screenX, screenY + 10, p.width, p.height - 10);
+
+                // Sombreado simple
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(screenX, screenY + p.height - 5, p.width, 5);
+            });
+        }
+        
+        function drawCoins() {
+            coins.forEach(c => {
+                const screenX = c.x - camera.x;
+                const screenY = c.y - camera.y;
+
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, c.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#f1c40f'; // Amarillo
+                ctx.fill();
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+        
+        function drawEnemies() {
+            enemies.forEach(e => {
+                const screenX = e.x - camera.x;
+                const screenY = e.y - camera.y;
+                
+                // Cuerpo
+                ctx.fillStyle = '#795548'; // Marrón
+                ctx.beginPath();
+                ctx.moveTo(screenX, screenY + e.height);
+                ctx.bezierCurveTo(screenX, screenY, screenX + e.width, screenY, screenX + e.width, screenY + e.height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Pies
+                ctx.fillStyle = '#5D4037';
+                ctx.fillRect(screenX, screenY + e.height - 5, 8, 5);
+                ctx.fillRect(screenX + e.width - 8, screenY + e.height - 5, 8, 5);
+
+                // Ojos
+                ctx.fillStyle = 'white';
+                ctx.fillRect(screenX + 6, screenY + 10, 8, 8);
+                ctx.fillRect(screenX + e.width - 14, screenY + 10, 8, 8);
+                ctx.fillStyle = 'black';
+                ctx.fillRect(screenX + 9, screenY + 13, 3, 3);
+                ctx.fillRect(screenX + e.width - 11, screenY + 13, 3, 3);
+            });
+        }
+
+        function drawGoal() {
+            const screenX = goal.x - camera.x;
+            const screenY = goal.y - camera.y;
+            
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            let rot = (Date.now() / 1000) * 2;
+            ctx.rotate(rot);
+
+            ctx.fillStyle = '#f1c40f';
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            let points = 5;
+            let outerRadius = 30;
+            let innerRadius = 15;
+
+            for (let i = 0; i < points * 2; i++) {
+                let radius = i % 2 === 0 ? outerRadius : innerRadius;
+                let angle = (i * Math.PI) / points - Math.PI / 2;
+                ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // --- LÓGICA DEL JUEGO ---
+
+        function levelInit() {
+            score = 0;
+            player.x = 100;
+            player.y = 400;
+            player.velocityX = 0;
+            player.velocityY = 0;
+            player.lives = 3;
+
+            platforms = [
+                // Suelo inicial
+                { x: -50, y: 550, width: 800, height: 50 },
+                // Plataformas flotantes
+                { x: 300, y: 450, width: 150, height: 20 },
+                { x: 550, y: 380, width: 200, height: 20 },
+                { x: 800, y: 300, width: 100, height: 20 },
+                { x: 1000, y: 400, width: 180, height: 20 },
+                { x: 1250, y: 350, width: 50, height: 20 },
+                { x: 1350, y: 300, width: 50, height: 20 },
+                { x: 1450, y: 250, width: 50, height: 20 },
+                { x: 1650, y: 450, width: 300, height: 20 },
+                { x: 2100, y: 400, width: 200, height: 20 },
+                { x: 2400, y: 350, width: 150, height: 20 },
+                { x: 2600, y: 550, width: 500, height: 50 },
+            ];
+
+            coins = [
+                { x: 375, y: 410, radius: 10, active: true },
+                { x: 600, y: 340, radius: 10, active: true },
+                { x: 650, y: 340, radius: 10, active: true },
+                { x: 700, y: 340, radius: 10, active: true },
+                { x: 1050, y: 360, radius: 10, active: true },
+                { x: 1100, y: 360, radius: 10, active: true },
+                { x: 1150, y: 360, radius: 10, active: true },
+                { x: 1700, y: 410, radius: 10, active: true },
+                { x: 1800, y: 410, radius: 10, active: true },
+                { x: 1900, y: 410, radius: 10, active: true },
+                { x: 2150, y: 360, radius: 10, active: true },
+                { x: 2250, y: 360, radius: 10, active: true },
+                { x: 2475, y: 310, radius: 10, active: true },
+            ];
+
+            enemies = [
+                { x: 600, y: 518, width: 32, height: 32, speed: 1, direction: 1, startX: 600, range: 100 },
+                { x: 1700, y: 518, width: 32, height: 32, speed: 1.5, direction: 1, startX: 1700, range: 150 },
+                { x: 2700, y: 518, width: 32, height: 32, speed: 1, direction: -1, startX: 2700, range: 100 },
+                { x: 2850, y: 518, width: 32, height: 32, speed: 1, direction: 1, startX: 2850, range: 100 },
+            ];
+            
+            goal = { x: 2950, y: 480 };
+        }
+
+        function updatePlayer() {
+            // Movimiento horizontal
+            if (keys.right) {
+                player.velocityX = player.speed;
+            } else if (keys.left) {
+                player.velocityX = -player.speed;
+            } else {
+                player.velocityX = 0;
+            }
+
+            // Salto
+            if (keys.up && player.onGround) {
+                player.velocityY = -player.jumpPower;
+                player.isJumping = true;
+                player.onGround = false;
+            }
+            
+            // Aplicar gravedad
+            player.velocityY += gravity;
+            
+            // Actualizar posición
+            let nextX = player.x + player.velocityX;
+            let nextY = player.y + player.velocityY;
+
+            player.onGround = false;
+
+            // Colisiones con plataformas
+            platforms.forEach(p => {
+                // Comprobar colisión
+                if (player.x < p.x + p.width && player.x + player.width > p.x &&
+                    player.y < p.y + p.height && player.y + player.height > p.y) {
+                    
+                    // Colisión desde arriba
+                    if (player.y + player.height <= p.y + player.velocityY + 1 && player.velocityY >= 0) {
+                        player.y = p.y - player.height;
+                        player.velocityY = 0;
+                        player.isJumping = false;
+                        player.onGround = true;
+                    }
+                    // Colisión desde abajo
+                    else if (player.y >= p.y + p.height - 10 && player.velocityY < 0) {
+                        player.y = p.y + p.height;
+                        player.velocityY = 0.1; // Pequeño rebote hacia abajo
+                    }
+                    // Colisiones laterales
+                    else {
+                        // Colisión por la derecha de la plataforma
+                        if (player.x + player.width > p.x && player.x < p.x) {
+                           player.x = p.x - player.width;
+                        }
+                        // Colisión por la izquierda de la plataforma
+                        else if (player.x < p.x + p.width && player.x + player.width > p.x + p.width) {
+                           player.x = p.x + p.width;
+                        }
+                    }
+                }
+            });
+
+            // Actualizar posición final
+            player.x += player.velocityX;
+            player.y += player.velocityY;
+
+            // Limitar movimiento a la izquierda
+            if (player.x < 0) player.x = 0;
+        }
+
+        function updateEnemies() {
+            enemies.forEach(e => {
+                e.x += e.speed * e.direction;
+                if (e.x < e.startX - e.range || e.x > e.startX + e.range) {
+                    e.direction *= -1;
+                }
+            });
+        }
+        
+        function checkCollisions() {
+            // Monedas
+            coins.forEach((c, index) => {
+                if (c.active) {
+                    const dist = Math.hypot(player.x + player.width/2 - c.x, player.y + player.height/2 - c.y);
+                    if (dist < player.width/2 + c.radius) {
+                        c.active = false;
+                        score += 100;
+                    }
+                }
+            });
+
+            // Enemigos
+            enemies.forEach((e, index) => {
+                if (player.x < e.x + e.width && player.x + player.width > e.x &&
+                    player.y < e.y + e.height && player.y + player.height > e.y) {
+                    
+                    // Pisando al enemigo
+                    if (player.velocityY > 0 && (player.y + player.height) < (e.y + 20)) {
+                        enemies.splice(index, 1);
+                        player.velocityY = -8; // pequeño rebote
+                        score += 200;
+                    } else {
+                        // Recibir daño
+                        playerDamaged();
+                    }
+                }
+            });
+
+            // Caída
+            if (player.y > GAME_HEIGHT + 100) {
+                playerDamaged();
+            }
+
+            // Meta
+            const distGoal = Math.hypot(player.x + player.width/2 - goal.x, player.y + player.height/2 - goal.y);
+            if (distGoal < player.width/2 + 20) {
+                currentGameState = GAME_STATE.WIN;
+            }
+        }
+
+        function playerDamaged() {
+            player.lives--;
+            if (player.lives <= 0) {
+                currentGameState = GAME_STATE.GAME_OVER;
+            } else {
+                // Respawn en la última plataforma segura (aproximado)
+                player.x = Math.max(100, player.x - 200);
+                player.y = 300;
+                player.velocityY = 0;
+                camera.x = player.x - 100;
+            }
+        }
+
+        function updateCamera() {
+            const targetCameraX = player.x - GAME_WIDTH / 4;
+            camera.x += (targetCameraX - camera.x) * 0.1;
+            if (camera.x < 0) {
+                camera.x = 0;
+            }
+        }
+
+        function drawUI() {
+            ctx.fillStyle = 'white';
+            ctx.font = '24px "Press Start 2P", sans-serif';
+            ctx.textAlign = 'left';
+            
+            // Score
+            ctx.fillText(`SCORE: ${score}`, 20, 40);
+
+            // Vidas
+            let heart = '❤️';
+            let livesText = `LIVES: ${heart.repeat(player.lives)}`;
+            ctx.fillText(livesText, GAME_WIDTH - 250, 40);
+        }
+
+        function drawStartScreen() {
+            ctx.fillStyle = '#5c94fc';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            ctx.font = '48px "Press Start 2P", sans-serif';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.fillText('Mario Super World', GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50);
+
+            ctx.font = '24px "Press Start 2P", sans-serif';
+            ctx.fillText('Presiona ENTER para empezar', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50);
+            
+            ctx.font = '16px "Press Start 2P", sans-serif';
+            ctx.fillText('Controles: Flechas para mover, Flecha Arriba para saltar', GAME_WIDTH / 2, GAME_HEIGHT - 50);
+        }
+        
+        function drawEndScreen(message) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            ctx.font = '60px "Press Start 2P", sans-serif';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.fillText(message, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20);
+
+            ctx.font = '30px "Press Start 2P", sans-serif';
+            ctx.fillText(`Puntuación final: ${score}`, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50);
+
+            ctx.font = '20px "Press Start 2P", sans-serif';
+            ctx.fillText('Presiona ENTER para jugar de nuevo', GAME_WIDTH / 2, GAME_HEIGHT - 100);
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            
+            switch (currentGameState) {
+                case GAME_STATE.START:
+                    drawStartScreen();
+                    break;
+                case GAME_STATE.RUNNING:
+                    // Lógica
+                    updatePlayer();
+                    updateEnemies();
+                    checkCollisions();
+                    updateCamera();
+                    
+                    // Dibujo
+                    ctx.fillStyle = '#5c94fc';
+                    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                    drawPlatforms();
+                    drawCoins();
+                    drawEnemies();
+                    drawGoal();
+                    drawPlayer();
+                    drawUI();
+                    break;
+                case GAME_STATE.GAME_OVER:
+                    drawEndScreen('GAME OVER');
+                    break;
+                case GAME_STATE.WIN:
+                    drawEndScreen('¡HAS GANADO!');
+                    break;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- MANEJADORES DE EVENTOS ---
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowRight') keys.right = true;
+            if (e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'ArrowUp') keys.up = true;
+            
+            if (e.code === 'Enter') {
+                if (currentGameState === GAME_STATE.START || currentGameState === GAME_STATE.GAME_OVER || currentGameState === GAME_STATE.WIN) {
+                    levelInit();
+                    currentGameState = GAME_STATE.RUNNING;
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowRight') keys.right = false;
+            if (e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'ArrowUp') keys.up = false;
+        });
+        
+        // Cargar fuente y empezar el juego
+        let font = new FontFace('Press Start 2P', 'url(https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2)');
+        font.load().then((loadedFont) => {
+            document.fonts.add(loadedFont);
+            gameLoop(); // Iniciar el bucle del juego
+        }).catch(err => {
+            console.error("Font not loaded", err);
+            gameLoop(); // Iniciar de todas formas con fuente por defecto
+        });
+    </script>
+</body>
+</html>
