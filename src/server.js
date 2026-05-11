@@ -98,12 +98,14 @@ El juego debe funcionar perfectamente dentro de un iframe sin comunicación cros
  * Llama a OpenRouter para generar código HTML de un juego.
  * Modelo: anthropic/claude-opus-4-5 — máxima calidad para generación creativa de código.
  */
-async function callAI(userPrompt) {
+async function callAI(userPrompt, isEdit = false) {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
         console.warn('OPENROUTER_API_KEY no configurada. Usando simulación.');
         return null;
     }
+
+    const activeSystemPrompt = isEdit ? EDIT_SYSTEM_PROMPT : SYSTEM_PROMPT;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -116,7 +118,7 @@ async function callAI(userPrompt) {
         body: JSON.stringify({
             model: 'anthropic/claude-opus-4-5',
             messages: [
-                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'system', content: activeSystemPrompt },
                 { role: 'user', content: userPrompt }
             ],
             max_tokens: 8192,
@@ -237,6 +239,142 @@ app.post('/api/generate', async (req, res) => {
             }
         );
     });
+});
+
+// =====================================================================
+// SISTEMA DE EDICIÓN DE JUEGOS CON IA + BACKUPS
+// =====================================================================
+
+const BACKUPS_DIR = path.join(__dirname, '../public/games/backups');
+if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+
+const EDIT_SYSTEM_PROMPT = `Eres un experto desarrollador de videojuegos HTML5 especializado en refactorización y mejora de código existente.
+Recibirás el código fuente completo de un videojuego HTML5 y una instrucción de modificación del usuario.
+
+TU TAREA:
+- Aplicar exactamente los cambios solicitados por el usuario al juego.
+- Mantener toda la funcionalidad existente a menos que el usuario pida explícitamente eliminarla.
+- Conservar el estilo general del juego a menos que el usuario pida cambiarlo.
+
+REQUISITOS DE SALIDA (igual que en creación):
+- Devuelve EXCLUSIVAMENTE el código HTML completo y modificado. Sin explicaciones, sin markdown.
+- El documento debe comenzar con <!DOCTYPE html> y terminar con </html>.
+- Autocontenido: todo el CSS en <style> y todo el JS en <script>, sin dependencias externas.
+- El resultado debe ser directamente ejecutable en el navegador.
+
+CALIDAD (igual que en creación):
+- Mantén o mejora la calidad visual: gradientes, animaciones, efectos de partículas si los había.
+- Usa requestAnimationFrame y deltaTime para el bucle de juego.
+- Asegúrate de que todos los controles (teclado y táctil) siguen funcionando.
+- Si arreglas bugs, asegúrate de que el resto del código no se rompa.`;
+
+// POST /api/games/edit — Editar un juego existente con IA
+app.post('/api/games/edit', async (req, res) => {
+    const { filename, instruction } = req.body;
+    if (!filename || !instruction) {
+        return res.status(400).json({ error: 'filename e instruction son requeridos' });
+    }
+
+    // Sanitizar nombre de archivo
+    const safeName = filename.replace(/[^a-zA-Z0-9_.\-]/g, '');
+    const gamePath = path.join(__dirname, '../public/games', safeName);
+
+    if (!fs.existsSync(gamePath)) {
+        return res.status(404).json({ error: 'Archivo de juego no encontrado' });
+    }
+
+    // 1. Leer el HTML actual
+    let currentHtml;
+    try {
+        currentHtml = fs.readFileSync(gamePath, 'utf8');
+    } catch (err) {
+        return res.status(500).json({ error: 'No se pudo leer el archivo del juego' });
+    }
+
+    // 2. Crear backup ANTES de modificar
+    const backupName = safeName.replace('.html', '') + '_backup_' + Date.now() + '.html';
+    const backupPath = path.join(BACKUPS_DIR, backupName);
+    try {
+        fs.copyFileSync(gamePath, backupPath);
+    } catch (err) {
+        return res.status(500).json({ error: 'No se pudo crear el backup' });
+    }
+
+    // 3. Llamar a la IA con el HTML actual + instrucción
+    const editPrompt = `Aquí está el código HTML completo del juego actual:\n\n${currentHtml}\n\n---\nInstrucción de modificación del usuario: "${instruction}"\n\nAplica los cambios solicitados y devuelve el código HTML completo y actualizado.`;
+
+    let newHtml;
+    try {
+        const aiResult = await callAI(editPrompt, true);
+        if (aiResult) {
+            newHtml = aiResult
+                .replace(/^```html\s*/i, '')
+                .replace(/^```\s*/i, '')
+                .replace(/\s*```$/i, '')
+                .trim();
+        } else {
+            // Sin IA configurada — devolver el original sin cambios
+            return res.status(503).json({ error: 'No hay API de IA configurada para editar juegos.' });
+        }
+    } catch (aiErr) {
+        // Si la IA falla, restaurar backup y reportar error
+        return res.status(500).json({ error: 'Error de IA: ' + aiErr.message, backupName });
+    }
+
+    // 4. Guardar el nuevo HTML
+    try {
+        fs.writeFileSync(gamePath, newHtml, 'utf8');
+    } catch (err) {
+        return res.status(500).json({ error: 'No se pudo guardar el juego editado' });
+    }
+
+    // 5. Registrar la edición en la base de datos
+    db.run(
+        'UPDATE games SET prompt_used = ? WHERE filename = ?',
+        [`[EDITADO] ${instruction}`, safeName],
+        (err) => { if (err) console.error('DB update error:', err.message); }
+    );
+
+    res.json({ success: true, backupName, message: 'Juego actualizado correctamente' });
+});
+
+// POST /api/games/restore — Restaurar backup de un juego
+app.post('/api/games/restore', (req, res) => {
+    const { filename, backupName } = req.body;
+    if (!filename || !backupName) {
+        return res.status(400).json({ error: 'filename y backupName son requeridos' });
+    }
+
+    const safeName = filename.replace(/[^a-zA-Z0-9_.\-]/g, '');
+    const safeBackup = backupName.replace(/[^a-zA-Z0-9_.\-]/g, '');
+    const gamePath = path.join(__dirname, '../public/games', safeName);
+    const backupPath = path.join(BACKUPS_DIR, safeBackup);
+
+    if (!fs.existsSync(backupPath)) {
+        return res.status(404).json({ error: 'Backup no encontrado' });
+    }
+
+    try {
+        fs.copyFileSync(backupPath, gamePath);
+        res.json({ success: true, message: 'Juego restaurado al backup anterior' });
+    } catch (err) {
+        res.status(500).json({ error: 'No se pudo restaurar el backup' });
+    }
+});
+
+// GET /api/games/backups/:filename — Listar backups de un juego
+app.get('/api/games/backups/:filename', (req, res) => {
+    const safeName = req.params.filename.replace(/[^a-zA-Z0-9_.\-]/g, '');
+    const base = safeName.replace('.html', '');
+    try {
+        const files = fs.readdirSync(BACKUPS_DIR)
+            .filter(f => f.startsWith(base + '_backup_'))
+            .sort()
+            .reverse(); // más reciente primero
+        res.json({ backups: files });
+    } catch {
+        res.json({ backups: [] });
+    }
 });
 
 app.listen(PORT, () => {

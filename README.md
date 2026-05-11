@@ -86,3 +86,16 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 - **[UI]** Selector de tamaño de iconos con 4 opciones: S (70px), M (106px), L (140px), XL (180px).
 - **[UI]** Botón de alternancia Modo Oscuro / Modo Claro: cambia toda la paleta de colores de naranja Friv a purple-dark.
 - **[JS]** Las preferencias de tamaño y tema se guardan en `localStorage` y se restauran al recargar la página.
+
+### v1.3 — Big Update: Editor de Juegos con IA + Sistema de Backups
+- **[Feature]** Nuevo botón **"✏️ Editar con IA"** en la barra superior de `play.html`.
+- **[Feature]** Modal de edición con 6 sugerencias rápidas (arreglar bugs, más niveles, mejorar estética, sonido, móvil, highscore) y textarea libre.
+- **[Backend]** Endpoint `POST /api/games/edit`: lee el HTML actual, crea un backup automático, llama a la IA con el HTML + instrucción y guarda el resultado.
+- **[Backend]** Endpoint `POST /api/games/restore`: restaura el backup anterior del juego.
+- **[Backend]** Endpoint `GET /api/games/backups/:filename`: lista todos los backups de un juego.
+- **[Backend]** `EDIT_SYSTEM_PROMPT` específico para edición: preserva funcionalidad existente y aplica solo los cambios pedidos.
+- **[Backend]** Backups almacenados en `public/games/backups/` con timestamp en el nombre.
+- **[UX]** Tras editar: botón **"🔄 Recargar juego"** y **"↩ Revertir al anterior"**.
+- **[UX]** Si la IA falla tras hacer backup, se muestra el botón de restaurar automáticamente.
+- **[UX]** El `callAI()` acepta modo edición (`isEdit=true`) para usar el prompt correcto.
+
