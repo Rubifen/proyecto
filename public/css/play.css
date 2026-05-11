@@ -146,8 +146,48 @@ body {
 }
 .back-link:hover { text-decoration: underline; }
 
+/* Header action buttons group */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Persistent restore button in header */
+.restore-header-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(245,158,11,0.45);
+    background: rgba(245,158,11,0.12);
+    color: #fbbf24;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    animation: pulseRestore 2.5s ease-in-out infinite;
+}
+.restore-header-btn:hover {
+    background: rgba(245,158,11,0.28);
+    border-color: #fbbf24;
+    color: #fff;
+    animation: none;
+    box-shadow: 0 0 14px rgba(245,158,11,0.35);
+}
+
+@keyframes pulseRestore {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+    50%       { box-shadow: 0 0 0 4px rgba(245,158,11,0.2); }
+}
+
 /* Edit button in header */
 .edit-open-btn {
+
 
     display: flex;
     align-items: center;

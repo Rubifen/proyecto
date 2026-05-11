@@ -18,10 +18,17 @@
             <span>Volver al catálogo</span>
         </a>
         <div id="play-title" class="play-title">Cargando...</div>
-        <button id="edit-open-btn" class="edit-open-btn" title="Editar este juego con IA">
-            <span>✏️</span>
-            <span>Editar con IA</span>
-        </button>
+        <div class="header-actions">
+            <!-- Botón revertir: solo visible cuando hay un backup activo -->
+            <button id="restore-header-btn" class="restore-header-btn hidden" title="Revertir al juego anterior">
+                <span>↩</span>
+                <span>Revertir</span>
+            </button>
+            <button id="edit-open-btn" class="edit-open-btn" title="Editar este juego con IA">
+                <span>✏️</span>
+                <span>Editar con IA</span>
+            </button>
+        </div>
     </header>
 
     <!-- GAME CONTAINER -->
@@ -81,16 +88,12 @@
                 <p>La IA está modificando el juego...<br><small>Guardando backup automático antes de aplicar ⏳</small></p>
             </div>
 
-            <!-- ESTADO: ÉXITO -->
+            <!-- ESTADO: ÉXITO — el modal se cierra solo -->
             <div id="edit-success" class="edit-result-box edit-success-box hidden">
                 <span class="result-icon">✅</span>
                 <div>
-                    <strong>¡Juego actualizado!</strong>
-                    <p>Recarga el juego para ver los cambios aplicados.</p>
-                </div>
-                <div class="edit-actions">
-                    <button id="reload-game-btn" class="action-btn reload-btn">🔄 Recargar juego</button>
-                    <button id="restore-backup-btn" class="action-btn restore-btn">↩ Revertir al anterior</button>
+                    <strong>¡Cambios aplicados!</strong>
+                    <p>Cerrando y recargando el juego...</p>
                 </div>
             </div>
 

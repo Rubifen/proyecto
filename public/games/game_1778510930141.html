@@ -41,9 +41,12 @@
             START: 0,
             RUNNING: 1,
             GAME_OVER: 2,
-            WIN: 3
+            WIN: 3,
+            LEVEL_COMPLETE: 4
         };
         let currentGameState = GAME_STATE.START;
+        let currentLevel = 1;
+        const MAX_LEVELS = 5;
 
         // Controles
         const keys = {
@@ -74,13 +77,61 @@
         let platforms = [];
         let coins = [];
         let enemies = [];
+        let spikes = [];
+        let movingPlatforms = [];
         let goal = {};
         let score = 0;
+        let totalScore = 0;
         
         let camera = {
             x: 0,
             y: 0
         };
+
+        // Colores de fondo por nivel
+        const levelColors = [
+            '#5c94fc', // Nivel 1 - Cielo azul
+            '#ff9966', // Nivel 2 - Atardecer
+            '#2c3e50', // Nivel 3 - Noche
+            '#8e44ad', // Nivel 4 - Místico
+            '#c0392b'  // Nivel 5 - Volcánico
+        ];
+
+        // Partículas para efectos
+        let particles = [];
+
+        function createParticle(x, y, color) {
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    life: 30,
+                    color: color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        function updateParticles() {
+            particles = particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.1;
+                p.life--;
+                return p.life > 0;
+            });
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life / 30;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - camera.x, p.y - camera.y, p.size, p.size);
+            });
+            ctx.globalAlpha = 1;
+        }
 
         // --- FUNCIONES DE DIBUJO ---
         function drawPlayer() {
@@ -88,18 +139,17 @@
             ctx.translate(player.x - camera.x, player.y - camera.y);
             
             // Cuerpo
-            ctx.fillStyle = '#e74c3c'; // Rojo
+            ctx.fillStyle = '#e74c3c';
             ctx.fillRect(0, 16, player.width, player.height - 16);
             
             // Overol
-            ctx.fillStyle = '#3498db'; // Azul
+            ctx.fillStyle = '#3498db';
             ctx.fillRect(4, 32, player.width - 8, 16);
             ctx.fillRect(0, 32, 8, 8);
             ctx.fillRect(player.width - 8, 32, 8, 8);
 
-
             // Cabeza
-            ctx.fillStyle = '#f1c40f'; // "Piel"
+            ctx.fillStyle = '#f1c40f';
             ctx.fillRect(4, 0, player.width - 8, 16);
 
             // Gorra
@@ -127,11 +177,11 @@
                 }
 
                 // Parte superior (césped)
-                ctx.fillStyle = '#27ae60'; // Verde
+                ctx.fillStyle = '#27ae60';
                 ctx.fillRect(screenX, screenY, p.width, 10);
                 
                 // Parte inferior (tierra)
-                ctx.fillStyle = '#8c5a2b'; // Marrón
+                ctx.fillStyle = '#8c5a2b';
                 ctx.fillRect(screenX, screenY + 10, p.width, p.height - 10);
 
                 // Sombreado simple
@@ -139,19 +189,65 @@
                 ctx.fillRect(screenX, screenY + p.height - 5, p.width, 5);
             });
         }
+
+        function drawMovingPlatforms() {
+            movingPlatforms.forEach(p => {
+                const screenX = p.x - camera.x;
+                const screenY = p.y - camera.y;
+
+                // Plataforma con efecto brillante
+                const gradient = ctx.createLinearGradient(screenX, screenY, screenX, screenY + p.height);
+                gradient.addColorStop(0, '#9b59b6');
+                gradient.addColorStop(1, '#8e44ad');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(screenX, screenY, p.width, p.height);
+
+                // Borde brillante
+                ctx.strokeStyle = '#e74c3c';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(screenX, screenY, p.width, p.height);
+            });
+        }
+
+        function drawSpikes() {
+            spikes.forEach(s => {
+                const screenX = s.x - camera.x;
+                const screenY = s.y - camera.y;
+
+                ctx.fillStyle = '#7f8c8d';
+                for (let i = 0; i < s.width / 16; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(screenX + i * 16, screenY + s.height);
+                    ctx.lineTo(screenX + i * 16 + 8, screenY);
+                    ctx.lineTo(screenX + i * 16 + 16, screenY + s.height);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            });
+        }
         
         function drawCoins() {
             coins.forEach(c => {
+                if (!c.active) return;
                 const screenX = c.x - camera.x;
                 const screenY = c.y - camera.y;
 
+                // Animación de flotación
+                const floatY = Math.sin(Date.now() / 200 + c.x) * 3;
+
                 ctx.beginPath();
-                ctx.arc(screenX, screenY, c.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#f1c40f'; // Amarillo
+                ctx.arc(screenX, screenY + floatY, c.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#f1c40f';
                 ctx.fill();
                 ctx.strokeStyle = '#f39c12';
                 ctx.lineWidth = 2;
                 ctx.stroke();
+
+                // Brillo
+                ctx.beginPath();
+                ctx.arc(screenX - 3, screenY + floatY - 3, 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.fill();
             });
         }
         
@@ -160,8 +256,8 @@
                 const screenX = e.x - camera.x;
                 const screenY = e.y - camera.y;
                 
-                // Cuerpo
-                ctx.fillStyle = '#795548'; // Marrón
+                // Cuerpo con color según tipo
+                ctx.fillStyle = e.fast ? '#e74c3c' : '#795548';
                 ctx.beginPath();
                 ctx.moveTo(screenX, screenY + e.height);
                 ctx.bezierCurveTo(screenX, screenY, screenX + e.width, screenY, screenX + e.width, screenY + e.height);
@@ -169,17 +265,29 @@
                 ctx.fill();
 
                 // Pies
-                ctx.fillStyle = '#5D4037';
+                ctx.fillStyle = e.fast ? '#c0392b' : '#5D4037';
                 ctx.fillRect(screenX, screenY + e.height - 5, 8, 5);
                 ctx.fillRect(screenX + e.width - 8, screenY + e.height - 5, 8, 5);
 
-                // Ojos
+                // Ojos (más enojados si son rápidos)
                 ctx.fillStyle = 'white';
                 ctx.fillRect(screenX + 6, screenY + 10, 8, 8);
                 ctx.fillRect(screenX + e.width - 14, screenY + 10, 8, 8);
-                ctx.fillStyle = 'black';
+                ctx.fillStyle = e.fast ? '#e74c3c' : 'black';
                 ctx.fillRect(screenX + 9, screenY + 13, 3, 3);
                 ctx.fillRect(screenX + e.width - 11, screenY + 13, 3, 3);
+
+                // Cejas enojadas para enemigos rápidos
+                if (e.fast) {
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(screenX + 4, screenY + 8);
+                    ctx.lineTo(screenX + 16, screenY + 12);
+                    ctx.moveTo(screenX + e.width - 4, screenY + 8);
+                    ctx.lineTo(screenX + e.width - 16, screenY + 12);
+                    ctx.stroke();
+                }
             });
         }
 
@@ -192,13 +300,15 @@
             let rot = (Date.now() / 1000) * 2;
             ctx.rotate(rot);
 
+            // Estrella más grande y brillante para niveles avanzados
+            const sizeMult = 1 + (currentLevel - 1) * 0.1;
             ctx.fillStyle = '#f1c40f';
             ctx.strokeStyle = '#f39c12';
             ctx.lineWidth = 4;
             ctx.beginPath();
             let points = 5;
-            let outerRadius = 30;
-            let innerRadius = 15;
+            let outerRadius = 30 * sizeMult;
+            let innerRadius = 15 * sizeMult;
 
             for (let i = 0; i < points * 2; i++) {
                 let radius = i % 2 === 0 ? outerRadius : innerRadius;
@@ -208,10 +318,229 @@
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
+
+            // Efecto de brillo
+            ctx.shadowColor = '#f1c40f';
+            ctx.shadowBlur = 20;
+            ctx.fill();
+
             ctx.restore();
         }
 
-        // --- LÓGICA DEL JUEGO ---
+        // --- DEFINICIÓN DE NIVELES ---
+        function getLevelData(level) {
+            const levels = {
+                1: {
+                    platforms: [
+                        { x: -50, y: 550, width: 800, height: 50 },
+                        { x: 300, y: 450, width: 150, height: 20 },
+                        { x: 550, y: 380, width: 200, height: 20 },
+                        { x: 800, y: 300, width: 100, height: 20 },
+                        { x: 1000, y: 400, width: 180, height: 20 },
+                        { x: 1250, y: 350, width: 80, height: 20 },
+                        { x: 1400, y: 300, width: 80, height: 20 },
+                        { x: 1550, y: 550, width: 400, height: 50 },
+                    ],
+                    coins: [
+                        { x: 375, y: 410, radius: 10, active: true },
+                        { x: 600, y: 340, radius: 10, active: true },
+                        { x: 650, y: 340, radius: 10, active: true },
+                        { x: 1050, y: 360, radius: 10, active: true },
+                        { x: 1100, y: 360, radius: 10, active: true },
+                    ],
+                    enemies: [
+                        { x: 600, y: 348, width: 32, height: 32, speed: 1, direction: 1, startX: 550, range: 150, fast: false },
+                    ],
+                    spikes: [],
+                    movingPlatforms: [],
+                    goal: { x: 1850, y: 480 }
+                },
+                2: {
+                    platforms: [
+                        { x: -50, y: 550, width: 500, height: 50 },
+                        { x: 200, y: 450, width: 100, height: 20 },
+                        { x: 400, y: 380, width: 120, height: 20 },
+                        { x: 600, y: 320, width: 100, height: 20 },
+                        { x: 800, y: 400, width: 150, height: 20 },
+                        { x: 1050, y: 550, width: 300, height: 50 },
+                        { x: 1200, y: 450, width: 80, height: 20 },
+                        { x: 1350, y: 380, width: 80, height: 20 },
+                        { x: 1500, y: 310, width: 80, height: 20 },
+                        { x: 1700, y: 550, width: 400, height: 50 },
+                    ],
+                    coins: [
+                        { x: 250, y: 410, radius: 10, active: true },
+                        { x: 450, y: 340, radius: 10, active: true },
+                        { x: 650, y: 280, radius: 10, active: true },
+                        { x: 875, y: 360, radius: 10, active: true },
+                        { x: 1240, y: 410, radius: 10, active: true },
+                        { x: 1390, y: 340, radius: 10, active: true },
+                        { x: 1540, y: 270, radius: 10, active: true },
+                        { x: 1850, y: 510, radius: 10, active: true },
+                    ],
+                    enemies: [
+                        { x: 300, y: 518, width: 32, height: 32, speed: 1.2, direction: 1, startX: 200, range: 200, fast: false },
+                        { x: 850, y: 368, width: 32, height: 32, speed: 1, direction: -1, startX: 800, range: 100, fast: false },
+                        { x: 1800, y: 518, width: 32, height: 32, speed: 1.5, direction: 1, startX: 1700, range: 150, fast: false },
+                    ],
+                    spikes: [
+                        { x: 550, y: 530, width: 48, height: 20 }
+                    ],
+                    movingPlatforms: [],
+                    goal: { x: 2000, y: 480 }
+                },
+                3: {
+                    platforms: [
+                        { x: -50, y: 550, width: 400, height: 50 },
+                        { x: 500, y: 480, width: 80, height: 20 },
+                        { x: 700, y: 400, width: 80, height: 20 },
+                        { x: 900, y: 320, width: 80, height: 20 },
+                        { x: 1100, y: 400, width: 100, height: 20 },
+                        { x: 1350, y: 550, width: 200, height: 50 },
+                        { x: 1650, y: 480, width: 60, height: 20 },
+                        { x: 1800, y: 400, width: 60, height: 20 },
+                        { x: 1950, y: 320, width: 60, height: 20 },
+                        { x: 2150, y: 550, width: 400, height: 50 },
+                    ],
+                    coins: [
+                        { x: 540, y: 440, radius: 10, active: true },
+                        { x: 740, y: 360, radius: 10, active: true },
+                        { x: 940, y: 280, radius: 10, active: true },
+                        { x: 1150, y: 360, radius: 10, active: true },
+                        { x: 1450, y: 510, radius: 10, active: true },
+                        { x: 1680, y: 440, radius: 10, active: true },
+                        { x: 1830, y: 360, radius: 10, active: true },
+                        { x: 1980, y: 280, radius: 10, active: true },
+                        { x: 2300, y: 510, radius: 10, active: true },
+                        { x: 2400, y: 510, radius: 10, active: true },
+                    ],
+                    enemies: [
+                        { x: 200, y: 518, width: 32, height: 32, speed: 1.5, direction: 1, startX: 100, range: 200, fast: false },
+                        { x: 1100, y: 368, width: 32, height: 32, speed: 1.2, direction: -1, startX: 1100, range: 50, fast: false },
+                        { x: 1400, y: 518, width: 32, height: 32, speed: 2, direction: 1, startX: 1350, range: 150, fast: true },
+                        { x: 2300, y: 518, width: 32, height: 32, speed: 1.8, direction: -1, startX: 2200, range: 200, fast: true },
+                    ],
+                    spikes: [
+                        { x: 400, y: 530, width: 80, height: 20 },
+                        { x: 1550, y: 530, width: 80, height: 20 }
+                    ],
+                    movingPlatforms: [
+                        { x: 1250, y: 450, width: 80, height: 15, speed: 1, direction: 1, startX: 1200, range: 100, vertical: false }
+                    ],
+                    goal: { x: 2450, y: 480 }
+                },
+                4: {
+                    platforms: [
+                        { x: -50, y: 550, width: 300, height: 50 },
+                        { x: 400, y: 500, width: 60, height: 20 },
+                        { x: 550, y: 430, width: 60, height: 20 },
+                        { x: 700, y: 360, width: 60, height: 20 },
+                        { x: 900, y: 450, width: 150, height: 20 },
+                        { x: 1150, y: 380, width: 60, height: 20 },
+                        { x: 1300, y: 310, width: 60, height: 20 },
+                        { x: 1500, y: 550, width: 150, height: 50 },
+                        { x: 1750, y: 480, width: 50, height: 20 },
+                        { x: 1900, y: 400, width: 50, height: 20 },
+                        { x: 2050, y: 320, width: 50, height: 20 },
+                        { x: 2200, y: 240, width: 50, height: 20 },
+                        { x: 2400, y: 550, width: 400, height: 50 },
+                    ],
+                    coins: [
+                        { x: 430, y: 460, radius: 10, active: true },
+                        { x: 580, y: 390, radius: 10, active: true },
+                        { x: 730, y: 320, radius: 10, active: true },
+                        { x: 950, y: 410, radius: 10, active: true },
+                        { x: 1000, y: 410, radius: 10, active: true },
+                        { x: 1180, y: 340, radius: 10, active: true },
+                        { x: 1330, y: 270, radius: 10, active: true },
+                        { x: 1575, y: 510, radius: 10, active: true },
+                        { x: 1775, y: 440, radius: 10, active: true },
+                        { x: 1925, y: 360, radius: 10, active: true },
+                        { x: 2075, y: 280, radius: 10, active: true },
+                        { x: 2225, y: 200, radius: 10, active: true },
+                        { x: 2550, y: 510, radius: 10, active: true },
+                    ],
+                    enemies: [
+                        { x: 150, y: 518, width: 32, height: 32, speed: 2, direction: 1, startX: 50, range: 150, fast: true },
+                        { x: 950, y: 418, width: 32, height: 32, speed: 1.5, direction: -1, startX: 900, range: 100, fast: false },
+                        { x: 1550, y: 518, width: 32, height: 32, speed: 2.2, direction: 1, startX: 1500, range: 100, fast: true },
+                        { x: 2500, y: 518, width: 32, height: 32, speed: 2, direction: -1, startX: 2400, range: 150, fast: true },
+                        { x: 2650, y: 518, width: 32, height: 32, speed: 1.8, direction: 1, startX: 2600, range: 100, fast: true },
+                    ],
+                    spikes: [
+                        { x: 300, y: 530, width: 80, height: 20 },
+                        { x: 1050, y: 430, width: 48, height: 20 },
+                        { x: 1650, y: 530, width: 80, height: 20 }
+                    ],
+                    movingPlatforms: [
+                        { x: 800, y: 500, width: 70, height: 15, speed: 1.2, direction: 1, startX: 750, range: 100, vertical: false },
+                        { x: 1400, y: 400, width: 70, height: 15, speed: 0.8, direction: 1, startY: 350, range: 100, vertical: true },
+                        { x: 2300, y: 350, width: 70, height: 15, speed: 1, direction: 1, startY: 300, range: 150, vertical: true }
+                    ],
+                    goal: { x: 2700, y: 480 }
+                },
+                5: {
+                    platforms: [
+                        { x: -50, y: 550, width: 250, height: 50 },
+                        { x: 350, y: 480, width: 50, height: 20 },
+                        { x: 500, y: 400, width: 50, height: 20 },
+                        { x: 650, y: 320, width: 50, height: 20 },
+                        { x: 850, y: 400, width: 100, height: 20 },
+                        { x: 1050, y: 320, width: 50, height: 20 },
+                        { x: 1200, y: 240, width: 50, height: 20 },
+                        { x: 1400, y: 550, width: 100, height: 50 },
+                        { x: 1600, y: 470, width: 40, height: 20 },
+                        { x: 1750, y: 390, width: 40, height: 20 },
+                        { x: 1900, y: 310, width: 40, height: 20 },
+                        { x: 2050, y: 230, width: 40, height: 20 },
+                        { x: 2250, y: 300, width: 80, height: 20 },
+                        { x: 2450, y: 380, width: 60, height: 20 },
+                        { x: 2650, y: 550, width: 500, height: 50 },
+                    ],
+                    coins: [
+                        { x: 375, y: 440, radius: 10, active: true },
+                        { x: 525, y: 360, radius: 10, active: true },
+                        { x: 675, y: 280, radius: 10, active: true },
+                        { x: 900, y: 360, radius: 10, active: true },
+                        { x: 1075, y: 280, radius: 10, active: true },
+                        { x: 1225, y: 200, radius: 10, active: true },
+                        { x: 1450, y: 510, radius: 10, active: true },
+                        { x: 1620, y: 430, radius: 10, active: true },
+                        { x: 1770, y: 350, radius: 10, active: true },
+                        { x: 1920, y: 270, radius: 10, active: true },
+                        { x: 2070, y: 190, radius: 10, active: true },
+                        { x: 2290, y: 260, radius: 10, active: true },
+                        { x: 2480, y: 340, radius: 10, active: true },
+                        { x: 2800, y: 510, radius: 10, active: true },
+                        { x: 2900, y: 510, radius: 10, active: true },
+                    ],
+                    enemies: [
+                        { x: 100, y: 518, width: 32, height: 32, speed: 2.5, direction: 1, startX: 50, range: 100, fast: true },
+                        { x: 880, y: 368, width: 32, height: 32, speed: 1.8, direction: -1, startX: 850, range: 50, fast: true },
+                        { x: 1420, y: 518, width: 32, height: 32, speed: 2.5, direction: 1, startX: 1400, range: 60, fast: true },
+                        { x: 2280, y: 268, width: 32, height: 32, speed: 1.5, direction: -1, startX: 2250, range: 40, fast: true },
+                        { x: 2750, y: 518, width: 32, height: 32, speed: 2.2, direction: 1, startX: 2650, range: 150, fast: true },
+                        { x: 2950, y: 518, width: 32, height: 32, speed: 2.5, direction: -1, startX: 2900, range: 150, fast: true },
+                    ],
+                    spikes: [
+                        { x: 250, y: 530, width: 80, height: 20 },
+                        { x: 750, y: 380, width: 48, height: 20 },
+                        { x: 1150, y: 220, width: 32, height: 20 },
+                        { x: 1500, y: 530, width: 80, height: 20 },
+                        { x: 2150, y: 280, width: 48, height: 20 },
+                        { x: 2550, y: 530, width: 80, height: 20 }
+                    ],
+                    movingPlatforms: [
+                        { x: 300, y: 520, width: 60, height: 15, speed: 1.5, direction: 1, startX: 250, range: 80, vertical: false },
+                        { x: 1000, y: 380, width: 60, height: 15, speed: 1, direction: 1, startY: 350, range: 80, vertical: true },
+                        { x: 1550, y: 500, width: 50, height: 15, speed: 1.3, direction: 1, startX: 1500, range: 80, vertical: false },
+                        { x: 2350, y: 350, width: 60, height: 15, speed: 1.2, direction: 1, startY: 320, range: 100, vertical: true }
+                    ],
+                    goal: { x: 3050, y: 480 }
+                }
+            };
+            return levels[level];
+        }
 
         function levelInit() {
             score = 0;
@@ -219,299 +548,9 @@
             player.y = 400;
             player.velocityX = 0;
             player.velocityY = 0;
-            player.lives = 3;
+            player.lives = 3 + Math.floor(currentLevel / 2); // Más vidas en niveles altos
+            particles = [];
+            camera.x = 0;
 
-            platforms = [
-                // Suelo inicial
-                { x: -50, y: 550, width: 800, height: 50 },
-                // Plataformas flotantes
-                { x: 300, y: 450, width: 150, height: 20 },
-                { x: 550, y: 380, width: 200, height: 20 },
-                { x: 800, y: 300, width: 100, height: 20 },
-                { x: 1000, y: 400, width: 180, height: 20 },
-                { x: 1250, y: 350, width: 50, height: 20 },
-                { x: 1350, y: 300, width: 50, height: 20 },
-                { x: 1450, y: 250, width: 50, height: 20 },
-                { x: 1650, y: 450, width: 300, height: 20 },
-                { x: 2100, y: 400, width: 200, height: 20 },
-                { x: 2400, y: 350, width: 150, height: 20 },
-                { x: 2600, y: 550, width: 500, height: 50 },
-            ];
-
-            coins = [
-                { x: 375, y: 410, radius: 10, active: true },
-                { x: 600, y: 340, radius: 10, active: true },
-                { x: 650, y: 340, radius: 10, active: true },
-                { x: 700, y: 340, radius: 10, active: true },
-                { x: 1050, y: 360, radius: 10, active: true },
-                { x: 1100, y: 360, radius: 10, active: true },
-                { x: 1150, y: 360, radius: 10, active: true },
-                { x: 1700, y: 410, radius: 10, active: true },
-                { x: 1800, y: 410, radius: 10, active: true },
-                { x: 1900, y: 410, radius: 10, active: true },
-                { x: 2150, y: 360, radius: 10, active: true },
-                { x: 2250, y: 360, radius: 10, active: true },
-                { x: 2475, y: 310, radius: 10, active: true },
-            ];
-
-            enemies = [
-                { x: 600, y: 518, width: 32, height: 32, speed: 1, direction: 1, startX: 600, range: 100 },
-                { x: 1700, y: 518, width: 32, height: 32, speed: 1.5, direction: 1, startX: 1700, range: 150 },
-                { x: 2700, y: 518, width: 32, height: 32, speed: 1, direction: -1, startX: 2700, range: 100 },
-                { x: 2850, y: 518, width: 32, height: 32, speed: 1, direction: 1, startX: 2850, range: 100 },
-            ];
-            
-            goal = { x: 2950, y: 480 };
-        }
-
-        function updatePlayer() {
-            // Movimiento horizontal
-            if (keys.right) {
-                player.velocityX = player.speed;
-            } else if (keys.left) {
-                player.velocityX = -player.speed;
-            } else {
-                player.velocityX = 0;
-            }
-
-            // Salto
-            if (keys.up && player.onGround) {
-                player.velocityY = -player.jumpPower;
-                player.isJumping = true;
-                player.onGround = false;
-            }
-            
-            // Aplicar gravedad
-            player.velocityY += gravity;
-            
-            // Actualizar posición
-            let nextX = player.x + player.velocityX;
-            let nextY = player.y + player.velocityY;
-
-            player.onGround = false;
-
-            // Colisiones con plataformas
-            platforms.forEach(p => {
-                // Comprobar colisión
-                if (player.x < p.x + p.width && player.x + player.width > p.x &&
-                    player.y < p.y + p.height && player.y + player.height > p.y) {
-                    
-                    // Colisión desde arriba
-                    if (player.y + player.height <= p.y + player.velocityY + 1 && player.velocityY >= 0) {
-                        player.y = p.y - player.height;
-                        player.velocityY = 0;
-                        player.isJumping = false;
-                        player.onGround = true;
-                    }
-                    // Colisión desde abajo
-                    else if (player.y >= p.y + p.height - 10 && player.velocityY < 0) {
-                        player.y = p.y + p.height;
-                        player.velocityY = 0.1; // Pequeño rebote hacia abajo
-                    }
-                    // Colisiones laterales
-                    else {
-                        // Colisión por la derecha de la plataforma
-                        if (player.x + player.width > p.x && player.x < p.x) {
-                           player.x = p.x - player.width;
-                        }
-                        // Colisión por la izquierda de la plataforma
-                        else if (player.x < p.x + p.width && player.x + player.width > p.x + p.width) {
-                           player.x = p.x + p.width;
-                        }
-                    }
-                }
-            });
-
-            // Actualizar posición final
-            player.x += player.velocityX;
-            player.y += player.velocityY;
-
-            // Limitar movimiento a la izquierda
-            if (player.x < 0) player.x = 0;
-        }
-
-        function updateEnemies() {
-            enemies.forEach(e => {
-                e.x += e.speed * e.direction;
-                if (e.x < e.startX - e.range || e.x > e.startX + e.range) {
-                    e.direction *= -1;
-                }
-            });
-        }
-        
-        function checkCollisions() {
-            // Monedas
-            coins.forEach((c, index) => {
-                if (c.active) {
-                    const dist = Math.hypot(player.x + player.width/2 - c.x, player.y + player.height/2 - c.y);
-                    if (dist < player.width/2 + c.radius) {
-                        c.active = false;
-                        score += 100;
-                    }
-                }
-            });
-
-            // Enemigos
-            enemies.forEach((e, index) => {
-                if (player.x < e.x + e.width && player.x + player.width > e.x &&
-                    player.y < e.y + e.height && player.y + player.height > e.y) {
-                    
-                    // Pisando al enemigo
-                    if (player.velocityY > 0 && (player.y + player.height) < (e.y + 20)) {
-                        enemies.splice(index, 1);
-                        player.velocityY = -8; // pequeño rebote
-                        score += 200;
-                    } else {
-                        // Recibir daño
-                        playerDamaged();
-                    }
-                }
-            });
-
-            // Caída
-            if (player.y > GAME_HEIGHT + 100) {
-                playerDamaged();
-            }
-
-            // Meta
-            const distGoal = Math.hypot(player.x + player.width/2 - goal.x, player.y + player.height/2 - goal.y);
-            if (distGoal < player.width/2 + 20) {
-                currentGameState = GAME_STATE.WIN;
-            }
-        }
-
-        function playerDamaged() {
-            player.lives--;
-            if (player.lives <= 0) {
-                currentGameState = GAME_STATE.GAME_OVER;
-            } else {
-                // Respawn en la última plataforma segura (aproximado)
-                player.x = Math.max(100, player.x - 200);
-                player.y = 300;
-                player.velocityY = 0;
-                camera.x = player.x - 100;
-            }
-        }
-
-        function updateCamera() {
-            const targetCameraX = player.x - GAME_WIDTH / 4;
-            camera.x += (targetCameraX - camera.x) * 0.1;
-            if (camera.x < 0) {
-                camera.x = 0;
-            }
-        }
-
-        function drawUI() {
-            ctx.fillStyle = 'white';
-            ctx.font = '24px "Press Start 2P", sans-serif';
-            ctx.textAlign = 'left';
-            
-            // Score
-            ctx.fillText(`SCORE: ${score}`, 20, 40);
-
-            // Vidas
-            let heart = '❤️';
-            let livesText = `LIVES: ${heart.repeat(player.lives)}`;
-            ctx.fillText(livesText, GAME_WIDTH - 250, 40);
-        }
-
-        function drawStartScreen() {
-            ctx.fillStyle = '#5c94fc';
-            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-            ctx.font = '48px "Press Start 2P", sans-serif';
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'center';
-            ctx.fillText('Mario Super World', GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50);
-
-            ctx.font = '24px "Press Start 2P", sans-serif';
-            ctx.fillText('Presiona ENTER para empezar', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50);
-            
-            ctx.font = '16px "Press Start 2P", sans-serif';
-            ctx.fillText('Controles: Flechas para mover, Flecha Arriba para saltar', GAME_WIDTH / 2, GAME_HEIGHT - 50);
-        }
-        
-        function drawEndScreen(message) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-            ctx.font = '60px "Press Start 2P", sans-serif';
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'center';
-            ctx.fillText(message, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20);
-
-            ctx.font = '30px "Press Start 2P", sans-serif';
-            ctx.fillText(`Puntuación final: ${score}`, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50);
-
-            ctx.font = '20px "Press Start 2P", sans-serif';
-            ctx.fillText('Presiona ENTER para jugar de nuevo', GAME_WIDTH / 2, GAME_HEIGHT - 100);
-        }
-
-        function gameLoop() {
-            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-            
-            switch (currentGameState) {
-                case GAME_STATE.START:
-                    drawStartScreen();
-                    break;
-                case GAME_STATE.RUNNING:
-                    // Lógica
-                    updatePlayer();
-                    updateEnemies();
-                    checkCollisions();
-                    updateCamera();
-                    
-                    // Dibujo
-                    ctx.fillStyle = '#5c94fc';
-                    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-                    drawPlatforms();
-                    drawCoins();
-                    drawEnemies();
-                    drawGoal();
-                    drawPlayer();
-                    drawUI();
-                    break;
-                case GAME_STATE.GAME_OVER:
-                    drawEndScreen('GAME OVER');
-                    break;
-                case GAME_STATE.WIN:
-                    drawEndScreen('¡HAS GANADO!');
-                    break;
-            }
-
-            requestAnimationFrame(gameLoop);
-        }
-
-        // --- MANEJADORES DE EVENTOS ---
-
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'ArrowRight') keys.right = true;
-            if (e.code === 'ArrowLeft') keys.left = true;
-            if (e.code === 'ArrowUp') keys.up = true;
-            
-            if (e.code === 'Enter') {
-                if (currentGameState === GAME_STATE.START || currentGameState === GAME_STATE.GAME_OVER || currentGameState === GAME_STATE.WIN) {
-                    levelInit();
-                    currentGameState = GAME_STATE.RUNNING;
-                }
-            }
-        });
-
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'ArrowRight') keys.right = false;
-            if (e.code === 'ArrowLeft') keys.left = false;
-            if (e.code === 'ArrowUp') keys.up = false;
-        });
-        
-        // Cargar fuente y empezar el juego
-        let font = new FontFace('Press Start 2P', 'url(https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2)');
-        font.load().then((loadedFont) => {
-            document.fonts.add(loadedFont);
-            gameLoop(); // Iniciar el bucle del juego
-        }).catch(err => {
-            console.error("Font not loaded", err);
-            gameLoop(); // Iniciar de todas formas con fuente por defecto
-        });
-    </script>
-</body>
-</html>
+            const levelData = getLevelData(currentLevel);
+            platforms = JSON
