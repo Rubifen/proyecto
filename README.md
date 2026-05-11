@@ -2,6 +2,12 @@
 
 Un portal de juegos web local (estilo Friv) donde los juegos son generados por IA.
 
+## Dependencias
+- `express`
+- `cors`
+- `sqlite3`
+- `dotenv`
+
 ## Registro de Cambios
 
 ### Fase 0 - Paso 0.1
@@ -10,3 +16,9 @@ Un portal de juegos web local (estilo Friv) donde los juegos son generados por I
 
 ### Fase 0 - Paso 0.2
 - Instaladas las dependencias: `express`, `cors`, `sqlite3` y `dotenv`.
+
+### Fase 0 - Paso 0.3
+- Actualizado el archivo README.md inicial con el título del proyecto, la descripción, la lista de dependencias y la sección "Registro de Cambios".
+
+### Fase 0 - Paso 0.4
+- Configurado el archivo `.gitignore` básico (excluyendo `node_modules`, `.env` y la base de datos `sqlite`).
